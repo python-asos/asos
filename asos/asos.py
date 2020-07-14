@@ -32,6 +32,8 @@ class WorkerThread(threading.Thread):
         self.storage_handler = storage_handler
         self.env = env
 
+        logging.info("Created a worker thread for task '%s'" % self.task_id)
+
     def run(self):
         while self.alive:
             if self.task_interval == 0:
@@ -101,7 +103,7 @@ class SupervisorTread(threading.Thread):
 
                 if task_type not in self.task_handlers:
                     logging.debug("Importing handler '%s' for task %s" % (task_id, task_type))
-                    task_handler_plugin = importlib.import_module("plugins.executor.%s.plugin" % task_type)
+                    task_handler_plugin = importlib.import_module("asos_%s.plugin" % task_type)
                     task_handler_object = task_handler_plugin.Executor()
                     self.task_handlers[task_type] = task_handler_object
                 else:
@@ -130,16 +132,16 @@ class SupervisorTread(threading.Thread):
 
         return self._thread_id
 
+def main(storage_plugin, instance_uuid):
+    logging.basicConfig(level=logging.INFO)
+
+    storage_plugin = importlib.import_module("asos_%s.plugin" % storage_plugin)
+    storage_object = storage_plugin.Storage()
+
+    logging.info("Starting supervisor thread..")
+    supervisor = SupervisorTread(storage_object, instance_uuid)
+    supervisor.start()
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-
-    configuration = {
-        "storage_plugin": "datacollector",
-        "uuid": "local",
-    }
-    
-    storage_plugin = importlib.import_module("plugins.storage.%s.plugin" % configuration['storage_plugin'])
-    storage_object = storage_plugin.Storage()
-    
-    supervisor = SupervisorTread(storage_object, configuration['uuid'])
-    supervisor.start()
+    main()
