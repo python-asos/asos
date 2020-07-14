@@ -12,7 +12,7 @@ setuptools.setup(
     description="A scheduler of stuff (ASOS)",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/python-asos/asos/",
+    url="https://github.com/python-asos/",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
