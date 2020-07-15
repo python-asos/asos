@@ -89,15 +89,21 @@ class SupervisorTread(threading.Thread):
             for task_id in tasks.keys():
                 logging.debug("Acquiring task %s" % task_id)
                 
-                if task_id in self.workers:
+                if task_id in self.workers:                        
+
                     if self.workers[task_id]['task'] == tasks[task_id]:
                         logging.debug("Task %s is already executing, skipping." % task_id)
-                        continue
+
+                        if not self.workers[task_id]['thread'].is_alive():
+                            logging.error("Thread %s for task %s is dead!" % (self.workers[task_id]['thread'], task_id))
+                        else:
+                            continue
                     else:
                         logging.warning("Task %s updated on storage, recreating thread" % task_id)
-                        self.workers[task_id]['thread'].stop()
-                        self.killed_workers[task_id] = self.workers[task_id]['thread']
-                        self.workers.pop(task_id)
+                    
+                    self.workers[task_id]['thread'].stop()
+                    self.killed_workers[task_id] = self.workers[task_id]['thread']
+                    self.workers.pop(task_id)
 
                 task_type = tasks[task_id]['task_type']
 
@@ -144,4 +150,4 @@ def main(storage_plugin, instance_uuid):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    main()
+    main("datacollector", "local9")
