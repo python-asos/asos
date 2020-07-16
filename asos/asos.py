@@ -28,7 +28,7 @@ class WorkerThread(threading.Thread):
         self.task_type = task['task_type']
         self.task_interval = task['task_interval']
         self.task = task
-        self.task_handler = task_handler
+        self.task_handler = task_handler()
         self.storage_handler = storage_handler
         self.env = env
 
@@ -71,7 +71,7 @@ class SupervisorTread(threading.Thread):
         super(SupervisorTread, self).__init__()
         self._thread_id = None
         self.alive = True
-        self.storage_handler = storage_handler
+        self.storage_handler = storage_handler()
         self.workers = {}
         self.killed_workers = {}
         self.task_handlers = {}
@@ -84,49 +84,56 @@ class SupervisorTread(threading.Thread):
     def run(self):
         while self.alive:
 
-            tasks = self.storage_handler.get_tasks()
+            try:
+                logging.info("SupervisorTread verification loop started")
+                tasks = self.storage_handler.get_tasks()
 
-            for task_id in tasks.keys():
-                logging.debug("Acquiring task %s" % task_id)
-                
-                if task_id in self.workers:                        
-
-                    if self.workers[task_id]['task'] == tasks[task_id]:
-                        logging.debug("Task %s is already executing, skipping." % task_id)
-
-                        if not self.workers[task_id]['thread'].is_alive():
-                            logging.error("Thread %s for task %s is dead!" % (self.workers[task_id]['thread'], task_id))
-                        else:
-                            continue
-                    else:
-                        logging.warning("Task %s updated on storage, recreating thread" % task_id)
+                for task_id in tasks.keys():
+                    logging.debug("Acquiring task %s" % task_id)
                     
-                    self.workers[task_id]['thread'].stop()
-                    self.killed_workers[task_id] = self.workers[task_id]['thread']
-                    self.workers.pop(task_id)
+                    if task_id in self.workers:                        
 
-                task_type = tasks[task_id]['task_type']
+                        if self.workers[task_id]['task'] == tasks[task_id]:
+                            logging.debug("Task %s is already executing, skipping." % task_id)
 
-                if task_type not in self.task_handlers:
-                    logging.debug("Importing handler '%s' for task %s" % (task_id, task_type))
-                    task_handler_plugin = importlib.import_module("asos_%s.plugin" % task_type)
-                    task_handler_object = task_handler_plugin.Executor()
-                    self.task_handlers[task_type] = task_handler_object
-                else:
-                    logging.debug("Task handler '%s' already imported, reusing." % (task_type))
-                    task_handler_object = self.task_handlers[task_type]
+                            if not self.workers[task_id]['thread'].is_alive():
+                                logging.error("Thread %s for task %s is dead!" % (self.workers[task_id]['thread'], task_id))
+                            else:
+                                continue
+                        else:
+                            logging.warning("Task %s updated on storage, recreating thread" % task_id)
+                        
+                        self.workers[task_id]['thread'].stop()
+                        self.killed_workers[task_id] = self.workers[task_id]['thread']
+                        self.workers.pop(task_id)
 
-                logging.debug("Creating a worker thread for task %s" % task_id)
+                    task_type = tasks[task_id]['task_type']
 
-                self.workers[task_id] = {
-                    'thread': WorkerThread(task_id=task_id, task=tasks[task_id], task_handler=task_handler_object, storage_handler=self.storage_handler, env=self.env),
-                    'task': tasks[task_id],
-                }
+                    if task_type not in self.task_handlers:
+                        logging.info("Importing handler '%s' for task %s" % (task_id, task_type))
+                        task_handler_plugin = importlib.import_module("asos_%s.plugin" % task_type)
+                        task_handler_object = task_handler_plugin.Executor
+                        self.task_handlers[task_type] = task_handler_object
+                    else:
+                        logging.debug("Task handler '%s' already imported, reusing." % (task_type))
+                        task_handler_object = self.task_handlers[task_type]
 
-                self.workers[task_id]['thread'].start()
+                    logging.info("Creating a worker thread for task %s" % task_id)
+
+                    self.workers[task_id] = {
+                        'thread': WorkerThread(task_id=task_id, task=tasks[task_id], task_handler=task_handler_object, storage_handler=self.storage_handler, env=self.env),
+                        'task': tasks[task_id],
+                    }
+
+                    self.workers[task_id]['thread'].start()
+        
+                time.sleep(5)
+
+            except Exception as e:
+                logging.error("SupervisorTread tripped: %s" % str(e))
+                time.sleep(1)
             
-            time.sleep(5)
-    
+
     def get_id(self):
 
         if self._thread_id is not None:
@@ -142,7 +149,7 @@ def main(storage_plugin, instance_uuid):
     logging.basicConfig(level=logging.INFO)
 
     storage_plugin = importlib.import_module("asos_%s.plugin" % storage_plugin)
-    storage_object = storage_plugin.Storage()
+    storage_object = storage_plugin.Storage
 
     logging.info("Starting supervisor thread..")
     supervisor = SupervisorTread(storage_object, instance_uuid)
@@ -150,4 +157,4 @@ def main(storage_plugin, instance_uuid):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    main("datacollector", "local9")
+    main("stub", "stub")
